@@ -257,6 +257,13 @@ typedef enum OrtMemType {
   OrtMemTypeDefault = 0,                // the default allocator for execution provider
 } OrtMemType;
 
+typedef enum OrtSparseFormat {
+  OrtSparseUndefined = 0,
+  OrtSparseCoo = 0x1,
+  OrtSparseCsr = 0x2,
+  OrtSparseBlockSparse = 0x4
+} OrtSparseFormat;
+
 typedef enum OrtCudnnConvAlgoSearch {
   EXHAUSTIVE,  // expensive exhaustive benchmarking using cudnnFindConvolutionForwardAlgorithmEx
   HEURISTIC,   // lightweight heuristic based search using cudnnGetConvolutionForwardAlgorithm_v7
