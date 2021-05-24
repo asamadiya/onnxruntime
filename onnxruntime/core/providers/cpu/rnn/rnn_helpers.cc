@@ -214,7 +214,8 @@ void ComputeGemm(const int M,
                  float* C,
                  float* C_end,
                  const int ldc,
-                 AllocatorPtr /*allocator*/,
+                 float*   /* a_data_quant */,
+                 int32_t* /* C_buffer_beta_1 */,
                  concurrency::ThreadPool* thread_pool) {
   // validate all the inputs
   // need to use the lda/ldb/ldc strides which should be >= the columns for the span
@@ -249,7 +250,8 @@ void ComputeGemm(const int M,
                  float* C,
                  float* C_end,
                  const int ldc,
-                 AllocatorPtr allocator,
+                 uint8_t* a_data_quant,
+                 int32_t* C_buffer_beta_1,
                  concurrency::ThreadPool* thread_pool) {
   // validate all the inputs
   // need to use the lda/ldb/ldc strides which should be >= the columns for the span
@@ -262,8 +264,6 @@ void ComputeGemm(const int M,
   uint8_t a_zero_point;
   GetQuantizationParameter(A, M * K, a_scale, a_zero_point, thread_pool);
 
-  uint8_t* a_data_quant = static_cast<uint8_t*>(allocator->Alloc(SafeInt<size_t>(M * K) * sizeof(uint8_t)));
-  BufferUniquePtr a_buffer_quant_holder(a_data_quant, BufferDeleter(allocator));
   // quantize the data
   ParQuantizeLinear(A, a_data_quant, M * K, a_scale, a_zero_point, thread_pool);
 
@@ -277,11 +277,9 @@ void ComputeGemm(const int M,
 
   size_t ld_C_buffer = ldc;
   int32_t* C_buffer = reinterpret_cast<int32_t*>(C);
-  BufferUniquePtr tmp_res_buffer_holder;
   if (beta == 1.0f) {
-    C_buffer = static_cast<int32_t*>(allocator->Alloc(SafeInt<size_t>(M * N) * sizeof(int32_t)));
+    C_buffer = C_buffer_beta_1;
     ld_C_buffer = static_cast<size_t>(N);
-    tmp_res_buffer_holder = BufferUniquePtr(C_buffer, BufferDeleter(allocator));
   }
 
   MLAS_QGEMM_SCALE_BIAS_OUTPUT_PROCESSOR output_processor(

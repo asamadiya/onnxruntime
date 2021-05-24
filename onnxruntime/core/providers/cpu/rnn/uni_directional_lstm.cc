@@ -199,6 +199,18 @@ void UniDirectionalLstm<T>::LoadBias(const gsl::span<const T>& WbRb_values) {
 }
 
 template <typename T>
+BufferUniquePtr AllocTempBufferForQuant(AllocatorPtr allocator, size_t /* element_count */, size_t /*element_size */) {
+  return BufferUniquePtr();
+}
+
+template <>
+BufferUniquePtr AllocTempBufferForQuant<uint8_t>(AllocatorPtr allocator, size_t element_count, size_t element_size) {
+  uint8_t* quant_buff = static_cast<uint8_t*>(allocator->Alloc(SafeInt<size_t>(element_count) * sizeof(element_size)));
+  BufferUniquePtr quant_buff_holder(quant_buff, BufferDeleter(allocator));
+  return quant_buff_holder;
+}
+
+template <typename T>
 template <typename WeightT>
 void UniDirectionalLstm<T>::Compute(const gsl::span<const T>& inputs_arg,
                                     const gsl::span<const int>& sequence_lengths_arg, const int num_directions,
@@ -257,10 +269,16 @@ void UniDirectionalLstm<T>::Compute(const gsl::span<const T>& inputs_arg,
   const int hidden_size_x4 = 4 * hidden_size_;
   const int total_rows = max_sequence_length * batch_size_;
 
+  auto quant_a_buffer_holder = AllocTempBufferForQuant<WeightT>(allocator_, total_rows * input_size_, sizeof(uint8_t));
+  auto quant_c_buffer_holder = AllocTempBufferForQuant<WeightT>(allocator_, total_rows * hidden_size_x4, sizeof(int32_t));
+
   // apply the weights to all the inputs and save to output_IOFC
   ComputeGemm(total_rows, hidden_size_x4, input_size_, alpha, inputs.cbegin(), inputs.cend(),
               input_weights,
-              beta, output_iofc_.begin(), output_iofc_.end(), hidden_size_x4, allocator_, thread_pool_);
+              beta, output_iofc_.begin(), output_iofc_.end(), hidden_size_x4,
+              (WeightT*)(quant_a_buffer_holder.get()),
+              (int32_t*)(quant_c_buffer_holder.get()),
+              thread_pool_);
 
   DumpMatrix("Xt*(W[iofc]^T)", output_iofc_.data(), total_rows, hidden_size_x4);
 
@@ -297,6 +315,8 @@ void UniDirectionalLstm<T>::Compute(const gsl::span<const T>& inputs_arg,
     // after the first step this will switch to the output from the previous step
     span_T_const_iter previous_state = batched_hidden_state_one_step.cbegin() + seq_start * hidden_size_;
 
+    auto quant_a_buffer_holder = AllocTempBufferForQuant<WeightT>(allocator_, num_seq_to_compute * hidden_size_, sizeof(uint8_t));
+    auto quant_c_buffer_holder = AllocTempBufferForQuant<WeightT>(allocator_, num_seq_to_compute * hidden_size_x4, sizeof(int32_t));
     // run through steps sequentially
     for (int step = 0; step < max_sequence_length; step++) {
 #if defined(DUMP_MATRIXES)
@@ -311,7 +331,10 @@ void UniDirectionalLstm<T>::Compute(const gsl::span<const T>& inputs_arg,
                   previous_state, previous_state_end,       // Ht-1
                   recurrent_weights,                        // R[iofc]
                   beta, step_out_IOFC, output_iofc_.end(),  // input contains Xt*(W[iofc]^T)
-                  hidden_size_x4, allocator_, ttp);
+                  hidden_size_x4,
+                  (WeightT*)(quant_a_buffer_holder.get()),
+                  (int32_t*)(quant_c_buffer_holder.get()),
+                  ttp);
 
       DumpMatrix("Xt*(W[iofc]^T) + Ht-t*R[iofc]" + row_str, &*step_out_IOFC, num_seq_to_compute_adjusted, hidden_size_x4);
 
@@ -362,7 +385,8 @@ void UniDirectionalLstm<T>::Compute(const gsl::span<const T>& inputs_arg,
   if (batch_parallel_) {
     double gemm_cost = num_seq_to_compute * hidden_size_x4 * hidden_size_;
     double cost = max_sequence_length * (gemm_cost + num_seq_to_compute);
-    ExecuteLambdaInParallel(sequences_calculator, batch_size_, num_seq_to_compute, cost, thread_pool_);
+    // disable second level parallel expansion
+    ExecuteLambdaInParallel(sequences_calculator, batch_size_, num_seq_to_compute, cost, nullptr);
   } else {
     sequences_calculator(0, thread_pool_);
   }

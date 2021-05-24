@@ -227,7 +227,8 @@ void ComputeGemm(const int M,
                  float* C,
                  float* C_end,
                  const int ldc,
-                 AllocatorPtr /*allocator*/,
+                 float*   /* a_data_quant */,
+                 int32_t* /* C_buffer_beta_1 */,
                  concurrency::ThreadPool* thread_pool);
 
 void ComputeGemm(const int M,
@@ -241,7 +242,8 @@ void ComputeGemm(const int M,
                  float* C,
                  float* C_end,
                  const int ldc,
-                 AllocatorPtr allocator,
+                 uint8_t* a_data_quant,
+                 int32_t* C_buffer_beta_1,
                  concurrency::ThreadPool* thread_pool);
 
 // helper to convert a span to a raw pointer
