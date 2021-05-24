@@ -199,7 +199,7 @@ void UniDirectionalLstm<T>::LoadBias(const gsl::span<const T>& WbRb_values) {
 }
 
 template <typename T>
-BufferUniquePtr AllocTempBufferForQuant(AllocatorPtr allocator, size_t /* element_count */, size_t /*element_size */) {
+BufferUniquePtr AllocTempBufferForQuant(AllocatorPtr /* allocator */, size_t /* element_count */, size_t /*element_size */) {
   return BufferUniquePtr();
 }
 
