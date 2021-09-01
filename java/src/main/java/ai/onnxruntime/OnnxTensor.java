@@ -572,6 +572,19 @@ public class OnnxTensor implements OnnxValue {
       OrtEnvironment env, OrtAllocator allocator, ByteBuffer data, long[] shape, OnnxJavaType type)
       throws OrtException {
     if ((!env.isClosed()) && (!allocator.isClosed())) {
+      switch (type) {
+        // only concerned w/ multi-byte types
+        case OnnxJavaType.INT16:
+        case OnnxJavaType.INT32:
+        case OnnxJavaType.INT64:
+        case OnnxJavaType.FLOAT:
+        case OnnxJavaType.DOUBLE: {
+          throw new IllegalStateException("Trying to create an OnnxTensor with a non-native ByteBuffer.");
+        }
+      }
+      if (data.order() != ByteOrder.nativeOrder()) {
+
+      }
       return createTensor(type, allocator, data, shape);
     } else {
       throw new IllegalStateException("Trying to create an OnnxTensor on a closed OrtAllocator.");
