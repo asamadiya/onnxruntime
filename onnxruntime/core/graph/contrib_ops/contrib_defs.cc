@@ -3193,7 +3193,7 @@ It's an extension of Gelu. It takes the sum of input A and bias input B as the i
         // set output shape:
         updateOutputShape(ctx, 0, {N, C, H_out, W_out});
       });
-      
+
   static const char* SparseDecomposeToDense_doc = R"DOC(
     This is a utility op that decomposes a Sparse Tensor in COO format to three dense tensors (dense_shape, values, indices).)DOC";
 
@@ -3217,7 +3217,7 @@ It's an extension of Gelu. It takes the sum of input A and bias input B as the i
         propagateElemTypeFromDtypeToOutput(ctx, element_type, 1); // values
         propagateElemTypeFromDtypeToOutput(ctx, TensorProto_DataType_INT64, 2); // indices
       });
-      
+
 #ifndef _OPSCHEMA_LIB_
   // Register the NCHWc schemas if supported by the platform.
   if (MlasNchwcGetBlockSize() > 1) {
